@@ -28,7 +28,8 @@ public class MainActivity extends Activity implements ClickerService.StatusCallb
 
     private ClickConfig cfg;
     private TextView tvStatus, tvCount, tvKeyEngine;
-    private Button btnStart;
+    private Button btnStart, btnFloat;
+    private boolean floatShown = false;
     private LinearLayout groupsBox;
     private CheckBox chkSimultaneous;
     private EditText edActionInterval, edCycleGap, edHold, edMaxMin, edMaxActions;
@@ -90,6 +91,12 @@ public class MainActivity extends Activity implements ClickerService.StatusCallb
         btnStart.setTextColor(Color.WHITE);
         btnStart.setOnClickListener(v -> toggleRun());
         root.addView(btnStart);
+
+        // ---- 游戏内悬浮控制球
+        btnFloat = btn("显示游戏内悬浮球（游戏里一键开始/停止）");
+        btnFloat.setOnClickListener(v -> toggleFloat());
+        root.addView(btnFloat);
+        root.addView(txt("开启后屏幕上出现小圆球：绿=运行中，红=已停止；点一下切换，按住可拖动。", 11, false));
 
         // ---- 组合方式
         chkSimultaneous = new CheckBox(this);
@@ -389,6 +396,30 @@ public class MainActivity extends Activity implements ClickerService.StatusCallb
                     .setAction(ClickerService.ACTION_START));
             serviceRunning = true;
             btnStart.setText("停止");
+        }
+    }
+
+    /** 显示/隐藏游戏内悬浮球 */
+    private void toggleFloat() {
+        if (!floatShown) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+                toast("请先授予「显示在其他应用上层」权限");
+                try {
+                    Intent it = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            android.net.Uri.parse("package:" + getPackageName()));
+                    startActivity(it);
+                } catch (Exception e) { toast("无法打开悬浮窗设置，请手动开启"); }
+                return;
+            }
+            startService(new Intent(this, FloatService.class).setAction(FloatService.ACTION_SHOW));
+            floatShown = true;
+            btnFloat.setText("隐藏游戏内悬浮球");
+            toast("悬浮球已显示，去游戏里点它开始");
+        } else {
+            startService(new Intent(this, FloatService.class).setAction(FloatService.ACTION_HIDE));
+            floatShown = false;
+            btnFloat.setText("显示游戏内悬浮球（游戏里一键开始/停止）");
+            toast("悬浮球已隐藏");
         }
     }
 

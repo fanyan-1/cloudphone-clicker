@@ -25,6 +25,7 @@ files = [
     'app/src/main/java/com/cloudphone/clicker/ClickerService.java',
     'app/src/main/java/com/cloudphone/clicker/MainActivity.java',
     'app/src/main/java/com/cloudphone/clicker/KeyInjector.java',
+    'app/src/main/java/com/cloudphone/clicker/FloatService.java',
     '.github/workflows/build.yml',
 ]
 for f in files:
@@ -40,6 +41,7 @@ cc      = read('app/src/main/java/com/cloudphone/clicker/ClickConfig.java') or '
 cs      = read('app/src/main/java/com/cloudphone/clicker/ClickerService.java') or ''
 ma      = read('app/src/main/java/com/cloudphone/clicker/MainActivity.java') or ''
 ki      = read('app/src/main/java/com/cloudphone/clicker/KeyInjector.java') or ''
+fs      = read('app/src/main/java/com/cloudphone/clicker/FloatService.java') or ''
 wf      = read('.github/workflows/build.yml') or ''
 
 # ---------- Manifest 一致
@@ -66,8 +68,14 @@ ck('workflow gradle 8.7', "gradle-version: '8.7'" in wf)
 ck('workflow assembleDebug', 'gradle assembleDebug' in wf)
 ck('workflow upload apk', 'app/build/outputs/apk/debug/*.apk' in wf)
 
+# ---------- 悬浮球 Manifest
+ck('float overlay permission', 'android.permission.SYSTEM_ALERT_WINDOW' in manifest)
+ck('float foreground service permission', 'android.permission.FOREGROUND_SERVICE_SPECIAL_USE' in manifest)
+ck('float service declared', '.FloatService' in manifest and 'foregroundServiceType="specialUse"' in manifest)
+ck('float service not exported', 'android:name=".FloatService"' in manifest and 'android:exported="false"' in manifest)
+
 # ---------- Java 结构
-for name, src in [('ClickConfig', cc), ('ClickerService', cs), ('MainActivity', ma)]:
+for name, src in [('ClickConfig', cc), ('ClickerService', cs), ('MainActivity', ma), ('FloatService', fs)]:
     ck(name + ' braces', src.count('{') == src.count('}'), '%d/%d' % (src.count('{'), src.count('}')))
     ck(name + ' parens', src.count('(') == src.count(')'))
     ck(name + ' package', src.lstrip().startswith('package com.cloudphone.clicker;'))
@@ -84,6 +92,17 @@ ck('access check case-insensitive', 'equalsIgnoreCase' in ma)
 ck('access check fallback list', 'getEnabledAccessibilityServiceList' in ma)
 ck('access check loose match', 'contains("clickerservice")' in ma.lower() or 'contains("clickerservice")' in ma)
 ck('refresh button', '刷新无障碍状态' in ma and 'refreshAccessStatus()' in ma)
+
+# ---------- 悬浮球功能
+ck('float activity toggle', 'toggleFloat()' in ma and 'btnFloat' in ma)
+ck('float overlay request', 'ACTION_MANAGE_OVERLAY_PERMISSION' in ma and 'canDrawOverlays' in ma)
+ck('float service actions', 'ACTION_SHOW' in fs and 'ACTION_HIDE' in fs)
+ck('float foreground', 'startForeground' in fs and 'CHANNEL_ID' in fs and 'createChannel' in fs)
+ck('float overlay window', 'TYPE_APPLICATION_OVERLAY' in fs and 'WindowManager.LayoutParams' in fs)
+ck('float draggable', 'ACTION_MOVE' in fs and 'updateViewLayout' in fs and 'ACTION_UP' in fs)
+ck('float click toggles engine', 'toggleEngine' in fs and 'ClickerService.ACTION_START' in fs and 'ClickerService.ACTION_STOP' in fs)
+ck('float status receiver', 'statusReceiver' in fs and 'ACTION_STATUS' in fs and 'requestStatus' in fs)
+ck('float color state', 'engineRunning ? Color.rgb' in fs)
 ck('service load config', 'ClickConfig.load(this)' in cs)
 ck('config save/load', 'static ClickConfig load' in cc and 'void save' in cc)
 ck('config json', 'JSONObject' in cc and 'toJson' in cc and 'fromJson' in cc)
@@ -191,6 +210,15 @@ fixtures = [
     ('break root input', 'input keyevent', 'input nokey', ki),
     ('break key send', 'KeyInjector.send', 'KeyInjector.noSend', cs),
     ('break key spinner', '键盘按键(Key)', '键盘按键X', ma),
+    ('break float overlay perm', 'android.permission.SYSTEM_ALERT_WINDOW', 'android.permission.NO_ALERT_WINDOW', manifest),
+    ('break float service decl', '.FloatService', '.XFloatService', manifest),
+    ('break float foreground type', 'foregroundServiceType="specialUse"', 'foregroundServiceType="none"', manifest),
+    ('break float toggle button', 'toggleFloat()', 'toggleFloatX()', ma),
+    ('break float overlay request', 'ACTION_MANAGE_OVERLAY_PERMISSION', 'ACTION_NO_OVERLAY', ma),
+    ('break float show action', 'ACTION_SHOW', 'ACTION_PRESENT', fs),
+    ('break float drag', 'updateViewLayout', 'noUpdateLayout', fs),
+    ('break float click engine', 'ClickerService.ACTION_START', 'ClickerService.ACTION_BEGIN', fs),
+    ('break float status sync', 'statusReceiver', 'noStatusReceiver', fs),
 ]
 tested = caught = 0
 for label, old, new, src in fixtures:
