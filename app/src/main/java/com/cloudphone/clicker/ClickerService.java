@@ -144,8 +144,6 @@ public class ClickerService extends AccessibilityService {
                     sleep(cfg.actionIntervalMs);
                 }
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
         } catch (Exception e) {
             Log.e(TAG, "loop error", e);
         } finally {
