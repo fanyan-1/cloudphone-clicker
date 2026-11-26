@@ -1,0 +1,6 @@
+*.apk
+*.zip
+artifact.zip
+_obsolete_*.java
+.gradle/
+local.properties
