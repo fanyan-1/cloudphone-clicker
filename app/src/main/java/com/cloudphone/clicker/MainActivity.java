@@ -346,12 +346,31 @@ public class MainActivity extends Activity implements ClickerService.StatusCallb
     }
 
     private boolean isAccessibilityOn() {
-        AccessibilityManager am = (AccessibilityManager) getSystemService(Context.ACCESSIBILITY_SERVICE);
-        if (am == null) return false;
-        for (AccessibilityServiceInfo info : am.getEnabledAccessibilityServiceList(
-                AccessibilityServiceInfo.FEEDBACK_ALL_MASK)) {
-            if (info.getId() != null && info.getId().contains(getPackageName())) return true;
-        }
+        // 权威判断：读系统设置里已启用的服务列表（与设置页开关一致）。
+        // 不用 getEnabledAccessibilityServiceList：它只列出已成功绑定的服务，
+        // 进程未起来/绑定延迟时会误报「未开启」。
+        try {
+            String flat = Settings.Secure.getString(getContentResolver(),
+                    Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+            if (flat != null) {
+                String shortName = getPackageName() + "/." + ClickerService.class.getSimpleName();
+                String fullName  = getPackageName() + "/" + ClickerService.class.getName();
+                for (String part : flat.split(":")) {
+                    String p = part.trim();
+                    if (p.equalsIgnoreCase(shortName) || p.equalsIgnoreCase(fullName)) return true;
+                }
+            }
+        } catch (Exception ignored) { }
+        // 兜底：设置读取失败时用兼容判断（不限制反馈类型）
+        try {
+            AccessibilityManager am = (AccessibilityManager) getSystemService(Context.ACCESSIBILITY_SERVICE);
+            if (am != null) {
+                for (AccessibilityServiceInfo info : am.getEnabledAccessibilityServiceList(
+                        AccessibilityServiceInfo.FEEDBACK_ALL_MASK)) {
+                    if (info.getId() != null && info.getId().contains(getPackageName())) return true;
+                }
+            }
+        } catch (Exception ignored) { }
         return false;
     }
 

@@ -75,6 +75,10 @@ ck('service status broadcast', 'ACTION_STATUS' in cs and 'sendBroadcast' in cs)
 ck('activity receiver', 'BroadcastReceiver' in ma and 'registerReceiver' in ma)
 ck('activity start/stop service', 'startService' in ma and 'stopService' in ma)
 ck('activity load config', 'ClickConfig.load(this)' in ma)
+ck('access check via settings secure', 'ENABLED_ACCESSIBILITY_SERVICES' in ma and 'Settings.Secure.getString' in ma)
+ck('access check short/full name', 'ClickerService.class.getSimpleName()' in ma and 'ClickerService.class.getName()' in ma)
+ck('access check case-insensitive', 'equalsIgnoreCase' in ma)
+ck('access check fallback list', 'getEnabledAccessibilityServiceList' in ma)
 ck('service load config', 'ClickConfig.load(this)' in cs)
 ck('config save/load', 'static ClickConfig load' in cc and 'void save' in cc)
 ck('config json', 'JSONObject' in cc and 'toJson' in cc and 'fromJson' in cc)
@@ -142,6 +146,9 @@ fixtures = [
     ('break round robin', '(seqIdx + k) % n', '(seqIdx + k) % 1', cs),
     ('break workflow apk path', 'app/build/outputs/apk/debug/*.apk', 'wrong/path/*.apk', wf),
     ('break applicationId', "applicationId 'com.cloudphone.clicker'", "applicationId 'com.x.y'", appgrad),
+    ('break access secure check', 'ENABLED_ACCESSIBILITY_SERVICES', 'DISABLED_ACCESSIBILITY_SERVICES', ma),
+    ('break access equalignore', 'equalsIgnoreCase', 'equalsPlain', ma),
+    ('break access fallback', 'getEnabledAccessibilityServiceList', 'getDisabledAccessibilityServiceList', ma),
 ]
 tested = caught = 0
 for label, old, new, src in fixtures:
