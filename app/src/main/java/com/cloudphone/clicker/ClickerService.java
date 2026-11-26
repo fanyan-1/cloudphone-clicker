@@ -259,7 +259,7 @@ public class ClickerService extends AccessibilityService {
             if (!all.isEmpty()) {
                 int[] arr = new int[all.size()];
                 for (int i = 0; i < all.size(); i++) arr[i] = all.get(i);
-                long hold = Math.max(1, keyActions.get(0).holdMs);
+                int hold = Math.max(1, keyActions.get(0).holdMs);
                 if (!KeyInjector.send(arr, hold, true)) {
                     Log.w(TAG, "同时按键失败 / " + KeyInjector.detailText());
                 }

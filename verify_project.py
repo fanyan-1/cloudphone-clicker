@@ -110,6 +110,7 @@ for name, needle in [
 ck('service fireKey', 'fireKey(' in cs and 'keyCodesOf(' in cs)
 ck('service key dispatch', 'ACT_KEY' in cs and 'KeyInjector.send' in cs)
 ck('service simultaneous key', 'keyActions' in cs and 'KeyInjector.send(arr' in cs)
+ck('key hold int type', 'int hold = Math.max(1, keyActions.get(0).holdMs)' in cs)
 ck('activity key engine ui', 'tvKeyEngine' in ma and 'KeyInjector.statusText()' in ma)
 ck('activity key spinner', '键盘按键(Key)' in ma and 'KeyInjector.KEY_NAMES' in ma)
 ck('activity key guard', 'KeyInjector.available()' in ma and '按键引擎不可用' in ma)
