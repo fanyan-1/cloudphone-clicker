@@ -28,8 +28,9 @@ public class MainActivity extends Activity implements ClickerService.StatusCallb
 
     private ClickConfig cfg;
     private TextView tvStatus, tvCount, tvKeyEngine;
-    private Button btnStart, btnFloat;
+    private Button btnStart, btnFloat, btnPick;
     private boolean floatShown = false;
+    private boolean pickShown = false;
     private LinearLayout groupsBox;
     private CheckBox chkSimultaneous;
     private EditText edActionInterval, edCycleGap, edHold, edMaxMin, edMaxActions;
@@ -97,6 +98,12 @@ public class MainActivity extends Activity implements ClickerService.StatusCallb
         btnFloat.setOnClickListener(v -> toggleFloat());
         root.addView(btnFloat);
         root.addView(txt("开启后屏幕上出现小圆球：绿=运行中，红=已停止；点一下切换，按住可拖动。", 11, false));
+
+        // ---- 坐标拾取
+        btnPick = btn("拾取游戏按钮坐标（点屏幕直接显示X/Y）");
+        btnPick.setOnClickListener(v -> togglePick());
+        root.addView(btnPick);
+        root.addView(txt("不知道技能按钮坐标？点这里→点游戏里按钮→显示精确坐标→记下来填进动作点。", 11, false));
 
         // ---- 组合方式
         chkSimultaneous = new CheckBox(this);
@@ -411,6 +418,12 @@ public class MainActivity extends Activity implements ClickerService.StatusCallb
                 } catch (Exception e) { toast("无法打开悬浮窗设置，请手动开启"); }
                 return;
             }
+            // 悬浮球和拾取层互斥：先退出拾取
+            if (pickShown) {
+                startService(new Intent(this, PickService.class).setAction(PickService.ACTION_STOP));
+                pickShown = false;
+                btnPick.setText("拾取游戏按钮坐标（点屏幕直接显示X/Y）");
+            }
             startService(new Intent(this, FloatService.class).setAction(FloatService.ACTION_SHOW));
             floatShown = true;
             btnFloat.setText("隐藏游戏内悬浮球");
@@ -420,6 +433,36 @@ public class MainActivity extends Activity implements ClickerService.StatusCallb
             floatShown = false;
             btnFloat.setText("显示游戏内悬浮球（游戏里一键开始/停止）");
             toast("悬浮球已隐藏");
+        }
+    }
+
+    /** 拾取游戏按钮坐标：全屏透明层，点屏幕显示 X/Y */
+    private void togglePick() {
+        if (!pickShown) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+                toast("请先授予「显示在其他应用上层」权限");
+                try {
+                    Intent it = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            android.net.Uri.parse("package:" + getPackageName()));
+                    startActivity(it);
+                } catch (Exception e) { toast("无法打开悬浮窗设置，请手动开启"); }
+                return;
+            }
+            // 拾取和悬浮球互斥：先关掉悬浮球
+            if (floatShown) {
+                startService(new Intent(this, FloatService.class).setAction(FloatService.ACTION_HIDE));
+                floatShown = false;
+                btnFloat.setText("显示游戏内悬浮球（游戏里一键开始/停止）");
+            }
+            startService(new Intent(this, PickService.class).setAction(PickService.ACTION_START));
+            pickShown = true;
+            btnPick.setText("退出坐标拾取");
+            toast("拾取中：切到游戏点按钮，记下顶部显示的坐标");
+        } else {
+            startService(new Intent(this, PickService.class).setAction(PickService.ACTION_STOP));
+            pickShown = false;
+            btnPick.setText("拾取游戏按钮坐标（点屏幕直接显示X/Y）");
+            toast("已退出拾取");
         }
     }
 

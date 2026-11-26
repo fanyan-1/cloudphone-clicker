@@ -26,6 +26,7 @@ files = [
     'app/src/main/java/com/cloudphone/clicker/MainActivity.java',
     'app/src/main/java/com/cloudphone/clicker/KeyInjector.java',
     'app/src/main/java/com/cloudphone/clicker/FloatService.java',
+    'app/src/main/java/com/cloudphone/clicker/PickService.java',
     '.github/workflows/build.yml',
 ]
 for f in files:
@@ -42,6 +43,7 @@ cs      = read('app/src/main/java/com/cloudphone/clicker/ClickerService.java') o
 ma      = read('app/src/main/java/com/cloudphone/clicker/MainActivity.java') or ''
 ki      = read('app/src/main/java/com/cloudphone/clicker/KeyInjector.java') or ''
 fs      = read('app/src/main/java/com/cloudphone/clicker/FloatService.java') or ''
+ps      = read('app/src/main/java/com/cloudphone/clicker/PickService.java') or ''
 wf      = read('.github/workflows/build.yml') or ''
 
 # ---------- Manifest 一致
@@ -73,9 +75,10 @@ ck('float overlay permission', 'android.permission.SYSTEM_ALERT_WINDOW' in manif
 ck('float foreground service permission', 'android.permission.FOREGROUND_SERVICE_SPECIAL_USE' in manifest)
 ck('float service declared', '.FloatService' in manifest and 'foregroundServiceType="specialUse"' in manifest)
 ck('float service not exported', 'android:name=".FloatService"' in manifest and 'android:exported="false"' in manifest)
+ck('pick service declared', '.PickService' in manifest and 'foregroundServiceType="specialUse"' in manifest)
 
 # ---------- Java 结构
-for name, src in [('ClickConfig', cc), ('ClickerService', cs), ('MainActivity', ma), ('FloatService', fs)]:
+for name, src in [('ClickConfig', cc), ('ClickerService', cs), ('MainActivity', ma), ('FloatService', fs), ('PickService', ps)]:
     ck(name + ' braces', src.count('{') == src.count('}'), '%d/%d' % (src.count('{'), src.count('}')))
     ck(name + ' parens', src.count('(') == src.count(')'))
     ck(name + ' package', src.lstrip().startswith('package com.cloudphone.clicker;'))
@@ -103,6 +106,18 @@ ck('float draggable', 'ACTION_MOVE' in fs and 'updateViewLayout' in fs and 'ACTI
 ck('float click toggles engine', 'toggleEngine' in fs and 'ClickerService.ACTION_START' in fs and 'ClickerService.ACTION_STOP' in fs)
 ck('float status receiver', 'statusReceiver' in fs and 'ACTION_STATUS' in fs and 'requestStatus' in fs)
 ck('float color state', 'engineRunning ? Color.rgb' in fs)
+ck('float key engine guard', 'KeyInjector.available()' in fs and 'ClickConfig.ACT_KEY' in fs)
+
+# ---------- 坐标拾取功能
+ck('pick activity toggle', 'togglePick()' in ma and 'btnPick' in ma)
+ck('pick mutually exclusive float', 'FloatService.ACTION_HIDE' in ma and 'PickService.ACTION_START' in ma)
+ck('pick service actions', 'ACTION_START' in ps and 'ACTION_STOP' in ps)
+ck('pick foreground', 'startForeground' in ps and 'CHANNEL_ID' in ps)
+ck('pick fullscreen layer', 'MATCH_PARENT' in ps and 'overlayType' in ps)
+ck('pick raw coords', 'getRawX()' in ps and 'getRawY()' in ps)
+ck('pick touch consume', 'ACTION_DOWN' in ps and 'return true' in ps)
+ck('pick coord display', 'X=' in ps and 'Y=' in ps and 'tvCoord' in ps)
+ck('pick exit button', '退出拾取' in ps and 'stopSelf' in ps)
 ck('service load config', 'ClickConfig.load(this)' in cs)
 ck('config save/load', 'static ClickConfig load' in cc and 'void save' in cc)
 ck('config json', 'JSONObject' in cc and 'toJson' in cc and 'fromJson' in cc)
@@ -219,6 +234,13 @@ fixtures = [
     ('break float drag', 'updateViewLayout', 'noUpdateLayout', fs),
     ('break float click engine', 'ClickerService.ACTION_START', 'ClickerService.ACTION_BEGIN', fs),
     ('break float status sync', 'statusReceiver', 'noStatusReceiver', fs),
+    ('break float key guard', 'KeyInjector.available()', 'KeyInjector.noCheck()', fs),
+    ('break pick service decl', '.PickService', '.XPickService', manifest),
+    ('break pick button', 'togglePick()', 'togglePickX()', ma),
+    ('break pick raw x', 'getRawX()', 'getPosX()', ps),
+    ('break pick raw y', 'getRawY()', 'getPosY()', ps),
+    ('break pick fullscreen', 'WindowManager.LayoutParams.MATCH_PARENT', 'WindowManager.LayoutParams.WRAP_CONTENT', ps),
+    ('break pick exit', '退出拾取', '退出X', ps),
 ]
 tested = caught = 0
 for label, old, new, src in fixtures:

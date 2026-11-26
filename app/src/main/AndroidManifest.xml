@@ -45,6 +45,16 @@
                 android:value="悬浮控制球，用于游戏内一键开始/停止自动点击" />
         </service>
 
+        <!-- 坐标拾取工具：前台服务 + 悬浮窗 -->
+        <service
+            android:name=".PickService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="坐标拾取，点击屏幕显示X/Y坐标" />
+        </service>
+
     </application>
 
 </manifest>

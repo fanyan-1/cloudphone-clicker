@@ -188,6 +188,25 @@ public class FloatService extends Service {
             toast("请先开启无障碍权限");
             return;
         }
+        if (!engineRunning) {
+            // 与 App 按钮一致：用了键盘按键但引擎不可用，明确提示，避免"假运行"
+            boolean hasKey = false;
+            ClickConfig c = ClickConfig.load(this);
+            if (c != null) {
+                for (ClickConfig.Group g : c.groups) {
+                    if (g == null) continue;
+                    for (ClickConfig.Action a : g.actions) {
+                        if (a != null && a.type == ClickConfig.ACT_KEY) { hasKey = true; break; }
+                    }
+                    if (hasKey) break;
+                }
+            }
+            if (hasKey && !KeyInjector.available()) {
+                toast("按键引擎不可用：" + KeyInjector.detailText()
+                        + "。手游通常用坐标点击，请改用轻点坐标");
+                return;
+            }
+        }
         Intent it = new Intent(this, ClickerService.class);
         it.setAction(engineRunning ? ClickerService.ACTION_STOP : ClickerService.ACTION_START);
         try { startService(it); } catch (Exception e) { toast("启动失败：" + e.getMessage()); }
