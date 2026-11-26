@@ -24,6 +24,7 @@ files = [
     'app/src/main/java/com/cloudphone/clicker/ClickConfig.java',
     'app/src/main/java/com/cloudphone/clicker/ClickerService.java',
     'app/src/main/java/com/cloudphone/clicker/MainActivity.java',
+    'app/src/main/java/com/cloudphone/clicker/KeyInjector.java',
     '.github/workflows/build.yml',
 ]
 for f in files:
@@ -38,6 +39,7 @@ rootgrad= read('build.gradle') or ''
 cc      = read('app/src/main/java/com/cloudphone/clicker/ClickConfig.java') or ''
 cs      = read('app/src/main/java/com/cloudphone/clicker/ClickerService.java') or ''
 ma      = read('app/src/main/java/com/cloudphone/clicker/MainActivity.java') or ''
+ki      = read('app/src/main/java/com/cloudphone/clicker/KeyInjector.java') or ''
 wf      = read('.github/workflows/build.yml') or ''
 
 # ---------- Manifest 一致
@@ -83,7 +85,34 @@ ck('service load config', 'ClickConfig.load(this)' in cs)
 ck('config save/load', 'static ClickConfig load' in cc and 'void save' in cc)
 ck('config json', 'JSONObject' in cc and 'toJson' in cc and 'fromJson' in cc)
 ck('5 groups', 'GROUPS = 5' in cc)
-ck('action types', 'ACT_TAP' in cc and 'ACT_LONG' in cc and 'ACT_SWIPE' in cc)
+ck('action types', 'ACT_TAP' in cc and 'ACT_LONG' in cc and 'ACT_SWIPE' in cc and 'ACT_KEY' in cc)
+ck('key fields', 'keyName' in cc and 'keyCtrl' in cc and 'keyAlt' in cc and 'keyShift' in cc)
+ck('key json save', 'o.put("keyName"' in cc and 'o.put("keyCtrl"' in cc)
+ck('key json load', 'optString("keyName"' in cc and 'optBoolean("keyCtrl"' in cc)
+
+# ---------- 按键注入引擎
+for name, needle in [
+    ('ki injectInputEvent', 'injectInputEvent' in ki),
+    ('ki root shell', 'input keyevent' in ki and '"su"' in ki),
+    ('ki reflect mode', 'MODE_REFLECT' in ki),
+    ('ki root mode', 'MODE_ROOT' in ki),
+    ('ki detect', 'int detect()' in ki),
+    ('ki keymap AZ', "CODES.put(String.valueOf(c), KeyEvent.KEYCODE_A" in ki),
+    ('ki keymap F', 'KEYCODE_F1' in ki),
+    ('ki keymap arrows', 'KEYCODE_DPAD_UP' in ki and 'KEYCODE_DPAD_LEFT' in ki),
+    ('ki keymap mods', 'KEYCODE_CTRL_LEFT' in ki and 'KEYCODE_ALT_LEFT' in ki and 'KEYCODE_SHIFT_LEFT' in ki),
+    ('ki send', 'boolean send(int[] codes' in ki),
+    ('ki simultaneous', 'sendReflect' in ki and 'sendRoot' in ki),
+    ('ki status', 'statusText' in ki and 'detailText' in ki),
+]:
+    ck('KEY ' + name, needle)
+
+ck('service fireKey', 'fireKey(' in cs and 'keyCodesOf(' in cs)
+ck('service key dispatch', 'ACT_KEY' in cs and 'KeyInjector.send' in cs)
+ck('service simultaneous key', 'keyActions' in cs and 'KeyInjector.send(arr' in cs)
+ck('activity key engine ui', 'tvKeyEngine' in ma and 'KeyInjector.statusText()' in ma)
+ck('activity key spinner', '键盘按键(Key)' in ma and 'KeyInjector.KEY_NAMES' in ma)
+ck('activity key guard', 'KeyInjector.available()' in ma and '按键引擎不可用' in ma)
 
 # ---------- 引擎核心
 for name, needle in [
@@ -149,10 +178,26 @@ fixtures = [
     ('break access secure check', 'ENABLED_ACCESSIBILITY_SERVICES', 'DISABLED_ACCESSIBILITY_SERVICES', ma),
     ('break access equalignore', 'equalsIgnoreCase', 'equalsPlain', ma),
     ('break access fallback', 'getEnabledAccessibilityServiceList', 'getDisabledAccessibilityServiceList', ma),
+    ('break ACT_KEY type', 'ACT_KEY', 'ACT_ZZZ', [cc, cs, ma]),
+    ('break key name field', 'keyName', 'kbdLabel', [cc, cs, ma, ki]),
+    ('break injectInputEvent', 'injectInputEvent', 'injectNoEvent', ki),
+    ('break root input', 'input keyevent', 'input nokey', ki),
+    ('break key send', 'KeyInjector.send', 'KeyInjector.noSend', cs),
+    ('break key spinner', '键盘按键(Key)', '键盘按键X', ma),
 ]
 tested = caught = 0
 for label, old, new, src in fixtures:
     tested += 1
+    if isinstance(src, list):
+        muts = [x.replace(old, new) for x in src]
+        if all(m == o for m, o in zip(muts, src)):
+            print('   INJECTION-NOOP:', label); continue
+        # 检测：所有被注入文件里 old 都应消失（断言覆盖这些文件）
+        if all(old not in m for m in muts):
+            caught += 1
+        else:
+            print('   INJECTION-UNDETECTED:', label)
+        continue
     mut = src.replace(old, new)
     if mut == src:
         print('   INJECTION-NOOP:', label); continue

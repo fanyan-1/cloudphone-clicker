@@ -185,9 +185,13 @@ public class ClickerService extends AccessibilityService {
         }
     }
 
-    /** 依次模式的单个动作：轻点 / 长按 / 滑动 */
+    /** 依次模式的单个动作：轻点 / 长按 / 滑动 / 键盘按键 */
     private void dispatchOne(ClickConfig.Action a) {
         if (a == null) return;
+        if (a.type == ClickConfig.ACT_KEY) {
+            fireKey(a);
+            return;   // 按键不走手势，无需 awaitGesture
+        }
         if (a.type == ClickConfig.ACT_SWIPE) {
             dispatchSwipe(a);
         } else {
@@ -196,6 +200,32 @@ public class ClickerService extends AccessibilityService {
             dispatchTap(a.x, a.y, hold);
         }
         awaitGesture();
+    }
+
+    /** 把一个键盘动作（含修饰键）发给 KeyInjector */
+    private void fireKey(ClickConfig.Action a) {
+        int[] codes = keyCodesOf(a);
+        if (codes.length == 0) {
+            Log.w(TAG, "按键无效或引擎不可用: " + a.keyName);
+            return;
+        }
+        boolean ok = KeyInjector.send(codes, Math.max(1, a.holdMs), cfg.orderSimultaneous);
+        if (!ok) Log.w(TAG, "按键发送失败: " + a.keyName + " / " + KeyInjector.detailText());
+    }
+
+    /** 动作 → 键码数组（修饰键在前，主键最后） */
+    private int[] keyCodesOf(ClickConfig.Action a) {
+        if (!KeyInjector.available()) return new int[0];
+        java.util.List<Integer> list = new java.util.ArrayList<>();
+        if (a.keyCtrl)  list.add(android.view.KeyEvent.KEYCODE_CTRL_LEFT);
+        if (a.keyAlt)   list.add(android.view.KeyEvent.KEYCODE_ALT_LEFT);
+        if (a.keyShift) list.add(android.view.KeyEvent.KEYCODE_SHIFT_LEFT);
+        int main = KeyInjector.codeOf(a.keyName);
+        if (main < 0) return new int[0];
+        list.add(main);
+        int[] out = new int[list.size()];
+        for (int i = 0; i < list.size(); i++) out[i] = list.get(i);
+        return out;
     }
 
     /** 同时模式：把组内所有"轻点"合并成一个多点手势 */
@@ -208,13 +238,32 @@ public class ClickerService extends AccessibilityService {
         }
         GestureDescription.Builder b = new GestureDescription.Builder();
         int added = 0;
+        java.util.List<ClickConfig.Action> keyActions = new java.util.ArrayList<>();
         for (ClickConfig.Action a : actions) {
-            if (a == null || a.type == ClickConfig.ACT_SWIPE) continue; // 滑动不参与多点
+            if (a == null) continue;
+            if (a.type == ClickConfig.ACT_KEY) { keyActions.add(a); continue; } // 按键单独走注入
+            if (a.type == ClickConfig.ACT_SWIPE) continue; // 滑动不参与多点
             long hold = (a.type == ClickConfig.ACT_LONG) ? Math.max(1, a.holdMs) : 40;
             Path p = new Path();
             p.moveTo(a.x, a.y);
             b.addStroke(new GestureDescription.StrokeDescription(p, 0, hold, true));
             added++;
+        }
+        // 按键动作：同时把全部键码一起按下（真组合键）
+        if (!keyActions.isEmpty()) {
+            java.util.List<Integer> all = new java.util.ArrayList<>();
+            for (ClickConfig.Action a : keyActions) {
+                int[] codes = keyCodesOf(a);
+                for (int c : codes) if (!all.contains(c)) all.add(c);
+            }
+            if (!all.isEmpty()) {
+                int[] arr = new int[all.size()];
+                for (int i = 0; i < all.size(); i++) arr[i] = all.get(i);
+                long hold = Math.max(1, keyActions.get(0).holdMs);
+                if (!KeyInjector.send(arr, hold, true)) {
+                    Log.w(TAG, "同时按键失败 / " + KeyInjector.detailText());
+                }
+            }
         }
         if (added == 0) return;
         cycleBusy.set(true);

@@ -27,7 +27,7 @@ import java.util.List;
 public class MainActivity extends Activity implements ClickerService.StatusCallback {
 
     private ClickConfig cfg;
-    private TextView tvStatus, tvCount;
+    private TextView tvStatus, tvCount, tvKeyEngine;
     private Button btnStart;
     private LinearLayout groupsBox;
     private CheckBox chkSimultaneous;
@@ -69,6 +69,13 @@ public class MainActivity extends Activity implements ClickerService.StatusCallb
         Button btnPerm = btn("开启无障碍权限（必须）");
         btnPerm.setOnClickListener(v -> openAccessibility());
         root.addView(btnPerm);
+
+        // ---- 按键引擎状态（发真实键盘事件需要 Root 或系统签名）
+        tvKeyEngine = txt(KeyInjector.statusText(), 12, true);
+        tvKeyEngine.setTextColor(KeyInjector.available()
+                ? Color.rgb(22, 160, 90) : Color.rgb(150, 100, 20));
+        root.addView(tvKeyEngine);
+        root.addView(txt("说明：" + KeyInjector.detailText(), 11, false));
 
         // ---- 状态
         tvCount = txt("已执行 0 次 · 运行 0 秒", 13, false);
@@ -229,20 +236,50 @@ public class MainActivity extends Activity implements ClickerService.StatusCallb
         Spinner sp = new Spinner(this);
         ArrayAdapter<String> ad = new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_item,
-                new String[]{"轻点(Tap)", "长按(Long)", "滑动(Swipe)"});
+                new String[]{"轻点(Tap)", "长按(Long)", "滑动(Swipe)", "键盘按键(Key)"});
         ad.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         sp.setAdapter(ad);
-        sp.setSelection(Math.max(0, Math.min(2, a.type)));
+        sp.setSelection(Math.max(0, Math.min(3, a.type)));
         final Spinner spRef = sp;
         sp.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(android.widget.AdapterView<?> p, View v, int pos, long id) {
                 a.type = pos;
-                // 类型变化后重建该组，显示/隐藏对应输入框
-                // 简化：始终显示全部字段，用户按需填
+                // 简化：始终显示全部字段，用户按需填（按键行在下方）
             }
             @Override public void onNothingSelected(android.widget.AdapterView<?> p) {}
         });
         card.addView(sp);
+
+        // 键盘按键行：按键下拉 + Ctrl/Alt/Shift
+        TextView keyTag = txt("键盘按键（类型选 Key 时生效）", 12, false);
+        card.addView(keyTag);
+        LinearLayout keyRow = new LinearLayout(this);
+        keyRow.setOrientation(LinearLayout.HORIZONTAL);
+        Spinner keySp = new Spinner(this);
+        ArrayAdapter<String> kad = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, KeyInjector.KEY_NAMES);
+        kad.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        keySp.setAdapter(kad);
+        int kidx = -1;
+        for (int j = 0; j < KeyInjector.KEY_NAMES.length; j++) {
+            if (KeyInjector.KEY_NAMES[j].equalsIgnoreCase(a.keyName)) { kidx = j; break; }
+        }
+        keySp.setSelection(Math.max(0, kidx));
+        final Spinner keySpRef = keySp;
+        keySp.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(android.widget.AdapterView<?> p, View v, int pos, long id) {
+                a.keyName = KeyInjector.KEY_NAMES[pos];
+            }
+            @Override public void onNothingSelected(android.widget.AdapterView<?> p) {}
+        });
+        keyRow.addView(keySp);
+        final CheckBox kc = new CheckBox(this); kc.setText("Ctrl"); kc.setChecked(a.keyCtrl);
+        final CheckBox ka = new CheckBox(this); ka.setText("Alt");  ka.setChecked(a.keyAlt);
+        final CheckBox ks = new CheckBox(this); ks.setText("Shift"); ks.setChecked(a.keyShift);
+        keyRow.addView(kc); keyRow.addView(ka); keyRow.addView(ks);
+        card.addView(keyRow);
+        a.keyCtrl = kc.isChecked(); a.keyAlt = ka.isChecked(); a.keyShift = ks.isChecked();
+        a.keyName = KeyInjector.KEY_NAMES[Math.max(0, kidx)];
 
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -274,6 +311,7 @@ public class MainActivity extends Activity implements ClickerService.StatusCallb
                 a.y2 = parseInt(ey2.getText().toString());
                 a.holdMs = parseInt(eHold.getText().toString());
                 a.swipeMs = parseInt(eSwipe.getText().toString());
+                a.keyCtrl = kc.isChecked(); a.keyAlt = ka.isChecked(); a.keyShift = ks.isChecked();
             }
         };
         ex.addTextChangedListener(watcher);
@@ -326,6 +364,17 @@ public class MainActivity extends Activity implements ClickerService.StatusCallb
         if (!isAccessibilityOn()) {
             toast("请先开启无障碍权限");
             openAccessibility();
+            return;
+        }
+        // 若用了键盘按键但引擎不可用，提前提示
+        boolean hasKey = false;
+        for (ClickConfig.Group g : cfg.groups) {
+            for (ClickConfig.Action a : g.actions) {
+                if (a.type == ClickConfig.ACT_KEY) { hasKey = true; break; }
+            }
+        }
+        if (hasKey && !KeyInjector.available()) {
+            toast("按键引擎不可用：需要云手机 Root 或系统签名");
             return;
         }
         if (serviceRunning) {

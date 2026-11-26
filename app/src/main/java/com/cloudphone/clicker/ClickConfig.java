@@ -20,6 +20,7 @@ public class ClickConfig {
     public static final int ACT_TAP = 0;      // 轻点
     public static final int ACT_LONG = 1;     // 长按
     public static final int ACT_SWIPE = 2;    // 滑动(从 x,y 到 x2,y2)
+    public static final int ACT_KEY = 3;      // 键盘按键(真实 KeyEvent)
 
     /** 一个动作点 */
     public static class Action {
@@ -28,6 +29,9 @@ public class ClickConfig {
         public int x2 = 0, y2 = 0;   // 滑动终点
         public int holdMs = 80;      // 长按时长
         public int swipeMs = 200;    // 滑动时长
+        // 键盘按键（ACT_KEY）
+        public String keyName = "A";          // 主键名，如 W / F1 / 空格
+        public boolean keyCtrl = false, keyAlt = false, keyShift = false;  // 修饰键
 
         public Action() {}
 
@@ -41,6 +45,8 @@ public class ClickConfig {
                 o.put("type", type); o.put("x", x); o.put("y", y);
                 o.put("x2", x2); o.put("y2", y2);
                 o.put("holdMs", holdMs); o.put("swipeMs", swipeMs);
+                o.put("keyName", keyName);
+                o.put("keyCtrl", keyCtrl); o.put("keyAlt", keyAlt); o.put("keyShift", keyShift);
             } catch (JSONException ignored) {}
             return o;
         }
@@ -53,6 +59,10 @@ public class ClickConfig {
                 a.x2 = o.optInt("x2", 0); a.y2 = o.optInt("y2", 0);
                 a.holdMs = o.optInt("holdMs", 80);
                 a.swipeMs = o.optInt("swipeMs", 200);
+                a.keyName = o.optString("keyName", "A");
+                a.keyCtrl = o.optBoolean("keyCtrl", false);
+                a.keyAlt = o.optBoolean("keyAlt", false);
+                a.keyShift = o.optBoolean("keyShift", false);
             } catch (Exception ignored) {}
             return a;
         }
