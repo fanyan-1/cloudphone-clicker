@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">云手机点击精灵</string>
+    <string name="accessibility_desc">云手机点击精灵需要无障碍权限来模拟屏幕点击、长按和滑动，实现自动挂机。请在系统设置中开启本服务。</string>
+</resources>
