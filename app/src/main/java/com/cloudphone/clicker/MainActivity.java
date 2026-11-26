@@ -69,6 +69,9 @@ public class MainActivity extends Activity implements ClickerService.StatusCallb
         Button btnPerm = btn("开启无障碍权限（必须）");
         btnPerm.setOnClickListener(v -> openAccessibility());
         root.addView(btnPerm);
+        Button btnRefresh = btn("刷新无障碍状态（开完设置后点这里）");
+        btnRefresh.setOnClickListener(v -> { refreshAccessStatus(); toast("状态已刷新"); });
+        root.addView(btnRefresh);
 
         // ---- 按键引擎状态（发真实键盘事件需要 Root 或系统签名）
         tvKeyEngine = txt(KeyInjector.statusText(), 12, true);
@@ -402,12 +405,16 @@ public class MainActivity extends Activity implements ClickerService.StatusCallb
             String flat = Settings.Secure.getString(getContentResolver(),
                     Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
             if (flat != null) {
-                String shortName = getPackageName() + "/." + ClickerService.class.getSimpleName();
-                String fullName  = getPackageName() + "/" + ClickerService.class.getName();
+                String pkg = getPackageName();
+                String shortName = pkg + "/." + ClickerService.class.getSimpleName();
+                String fullName  = pkg + "/" + ClickerService.class.getName();
+                // 精确匹配
                 for (String part : flat.split(":")) {
                     String p = part.trim();
                     if (p.equalsIgnoreCase(shortName) || p.equalsIgnoreCase(fullName)) return true;
                 }
+                // 宽松兜底：云手机常把组件名写成各种形式，只要包含包名+服务名就算开
+                if (flat.contains(pkg) && flat.toLowerCase().contains("clickerservice")) return true;
             }
         } catch (Exception ignored) { }
         // 兜底：设置读取失败时用兼容判断（不限制反馈类型）

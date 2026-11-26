@@ -53,6 +53,7 @@ ck('manifest theme exists', '@style/AppTheme' in manifest and 'name="AppTheme"' 
 ck('manifest label exists', '@string/app_name' in manifest and 'name="app_name"' in strings)
 ck('accessibility desc exists', '@string/accessibility_desc' in cfgxml and 'accessibility_desc' in strings)
 ck('canPerformGestures', 'android:canPerformGestures="true"' in cfgxml)
+ck('feedbackType declared', 'android:accessibilityFeedbackType="feedbackGeneric"' in cfgxml)
 
 # ---------- Gradle
 ck('agp version', "com.android.application' version '8.5.2'" in rootgrad)
@@ -81,6 +82,8 @@ ck('access check via settings secure', 'ENABLED_ACCESSIBILITY_SERVICES' in ma an
 ck('access check short/full name', 'ClickerService.class.getSimpleName()' in ma and 'ClickerService.class.getName()' in ma)
 ck('access check case-insensitive', 'equalsIgnoreCase' in ma)
 ck('access check fallback list', 'getEnabledAccessibilityServiceList' in ma)
+ck('access check loose match', 'contains("clickerservice")' in ma.lower() or 'contains("clickerservice")' in ma)
+ck('refresh button', '刷新无障碍状态' in ma and 'refreshAccessStatus()' in ma)
 ck('service load config', 'ClickConfig.load(this)' in cs)
 ck('config save/load', 'static ClickConfig load' in cc and 'void save' in cc)
 ck('config json', 'JSONObject' in cc and 'toJson' in cc and 'fromJson' in cc)
@@ -168,6 +171,9 @@ for n,ok,d in fails: print('   FAIL:', n, d)
 # 注入规则：把 old 全量替换成不含 old 子串的 new，断言 old 从文件中彻底消失
 fixtures = [
     ('break canPerformGestures', 'canPerformGestures="true"', 'canPerformGestures="false"', cfgxml),
+    ('break feedbackType', 'accessibilityFeedbackType="feedbackGeneric"', 'accessibilityFeedbackType="feedbackNo"', cfgxml),
+    ('break loose match', 'contains("clickerservice")', 'contains("zzzzz")', ma),
+    ('break refresh button', '刷新无障碍状态', '刷新状态X', ma),
     ('break service class', '.ClickerService', '.XService', manifest),
     ('break GROUPS', 'GROUPS = 5', 'GROUPS = 1', cc),
     ('break gesture dispatch', 'dispatchGesture(', 'invokeGesture(', cs),
