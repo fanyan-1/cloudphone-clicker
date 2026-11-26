@@ -25,15 +25,10 @@ public class ClickerService extends AccessibilityService {
     public static final String TAG = "CloudClicker";
     public static final String ACTION_START = "com.cloudphone.clicker.START";
     public static final String ACTION_STOP = "com.cloudphone.clicker.STOP";
+    public static final String ACTION_STATUS = "com.cloudphone.clicker.STATUS";
 
-    /** 本地绑定，供 Activity 读取状态 */
-    public class LocalBinder extends android.os.Binder {
-        public ClickerService getService() { return ClickerService.this; }
-    }
-    private final LocalBinder binder = new LocalBinder();
-
-    @Override
-    public IBinder onBind(android.content.Intent intent) { return binder; }
+    // 注意：AccessibilityService.onBind 是 final，不能 override。
+    // Activity 通过 startService/stopService 控制，用静态回调拿状态。
 
     private volatile boolean running = false;
     private final AtomicBoolean cycleBusy = new AtomicBoolean(false);
@@ -65,6 +60,8 @@ public class ClickerService extends AccessibilityService {
             stopRunning();
         } else if (intent != null && ACTION_START.equals(intent.getAction())) {
             startRunning();
+        } else if (intent != null && ACTION_STATUS.equals(intent.getAction())) {
+            report();   // Activity 请求刷新状态
         }
         return START_STICKY;
     }
@@ -99,6 +96,7 @@ public class ClickerService extends AccessibilityService {
         worker.setPriority(Thread.NORM_PRIORITY + 1);
         worker.start();
         toast("已开始运行");
+        report();
     }
 
     public void stopRunning() {
@@ -110,6 +108,7 @@ public class ClickerService extends AccessibilityService {
             try { w.interrupt(); } catch (Exception ignored) {}
         }
         toast("已停止");
+        report();
     }
 
     private void loop() {
@@ -284,6 +283,14 @@ public class ClickerService extends AccessibilityService {
         final long c = actionCount;
         final long sec = startTime > 0 ? (System.currentTimeMillis() - startTime) / 1000 : 0;
         if (callback != null) main.post(() -> callback.onStatus(r, c, sec));
+        // 同时发广播，Activity 未绑定也能收到
+        try {
+            android.content.Intent it = new android.content.Intent(ACTION_STATUS);
+            it.putExtra("running", r);
+            it.putExtra("count", c);
+            it.putExtra("elapsed", sec);
+            sendBroadcast(it);
+        } catch (Exception ignored) {}
     }
 
     private void toast(String msg) {

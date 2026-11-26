@@ -70,8 +70,10 @@ for name, src in [('ClickConfig', cc), ('ClickerService', cs), ('MainActivity', 
     ck(name + ' package', src.lstrip().startswith('package com.cloudphone.clicker;'))
 
 # ---------- 类互相引用
-ck('service LocalBinder', 'class LocalBinder' in cs and 'onBind' in cs)
-ck('activity uses binder', 'ClickerService.LocalBinder' in ma)
+ck('service no onBind override', 'public IBinder onBind' not in cs)
+ck('service status broadcast', 'ACTION_STATUS' in cs and 'sendBroadcast' in cs)
+ck('activity receiver', 'BroadcastReceiver' in ma and 'registerReceiver' in ma)
+ck('activity start/stop service', 'startService' in ma and 'stopService' in ma)
 ck('activity load config', 'ClickConfig.load(this)' in ma)
 ck('service load config', 'ClickConfig.load(this)' in cs)
 ck('config save/load', 'static ClickConfig load' in cc and 'void save' in cc)

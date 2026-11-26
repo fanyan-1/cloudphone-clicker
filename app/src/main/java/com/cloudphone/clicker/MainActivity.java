@@ -2,15 +2,11 @@ package com.cloudphone.clicker;
 
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.app.Activity;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.ServiceConnection;
-import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.IBinder;
 import android.provider.Settings;
 import android.text.InputType;
 import android.view.View;
@@ -37,15 +33,13 @@ public class MainActivity extends Activity implements ClickerService.StatusCallb
     private CheckBox chkSimultaneous;
     private EditText edActionInterval, edCycleGap, edHold, edMaxMin, edMaxActions;
 
-    private ClickerService service;
-    private final ServiceConnection conn = new ServiceConnection() {
-        @Override public void onServiceConnected(ComponentName name, IBinder b) {
-            service = ((ClickerService.LocalBinder) b).getService();
-            ClickerService.setCallback(MainActivity.this);
-            refreshStatus();
-        }
-        @Override public void onServiceDisconnected(ComponentName name) {
-            service = null;
+    private volatile boolean serviceRunning = false;
+    private final android.content.BroadcastReceiver statusReceiver = new android.content.BroadcastReceiver() {
+        @Override public void onReceive(android.content.Context c, android.content.Intent i) {
+            if (ClickerService.ACTION_STATUS.equals(i.getAction())) {
+                onStatus(i.getBooleanExtra("running", false),
+                        i.getLongExtra("count", 0), i.getLongExtra("elapsed", 0));
+            }
         }
     };
 
@@ -120,14 +114,22 @@ public class MainActivity extends Activity implements ClickerService.StatusCallb
     protected void onResume() {
         super.onResume();
         refreshAccessStatus();
-        bindService(new Intent(this, ClickerService.class), conn, BIND_AUTO_CREATE);
+        ClickerService.setCallback(this);
+        android.content.IntentFilter f = new android.content.IntentFilter(ClickerService.ACTION_STATUS);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(statusReceiver, f, android.content.Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(statusReceiver, f);
+        }
+        // 主动请求服务回报一次状态
+        startService(new Intent(this, ClickerService.class).setAction(ClickerService.ACTION_STATUS));
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        try { unbindService(conn); } catch (Exception ignored) {}
         ClickerService.setCallback(null);
+        try { unregisterReceiver(statusReceiver); } catch (Exception ignored) {}
     }
 
     // ---------------- UI 构建 ----------------
@@ -326,17 +328,14 @@ public class MainActivity extends Activity implements ClickerService.StatusCallb
             openAccessibility();
             return;
         }
-        if (service == null) {
-            toast("服务未连接，请稍候重试");
-            return;
-        }
-        if (service.isRunning()) {
-            stopService(new Intent(this, ClickerService.class));
+        if (serviceRunning) {
+            stopService(new Intent(this, ClickerService.class).setAction(ClickerService.ACTION_STOP));
+            serviceRunning = false;
             btnStart.setText("开始运行");
-            toast("已停止");
         } else {
             startService(new Intent(this, ClickerService.class)
                     .setAction(ClickerService.ACTION_START));
+            serviceRunning = true;
             btnStart.setText("停止");
         }
     }
@@ -362,13 +361,10 @@ public class MainActivity extends Activity implements ClickerService.StatusCallb
         tvStatus.setTextColor(on ? Color.rgb(22, 160, 90) : Color.rgb(198, 54, 45));
     }
 
-    private void refreshStatus() {
-        if (service != null) onStatus(service.isRunning(), 0, 0);
-    }
-
     @Override
     public void onStatus(boolean running, long count, long elapsedSec) {
         runOnUiThread(() -> {
+            serviceRunning = running;
             tvCount.setText("已执行 " + count + " 次 · 运行 " + elapsedSec + " 秒");
             btnStart.setText(running ? "停止" : "开始运行");
         });
